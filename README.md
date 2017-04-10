@@ -1,4 +1,4 @@
-#frida-wshook
+# frida-wshook
  
 frida-wshook is an analysis and instrumentation tool which uses [frida.re](https://www.frida.re/) to hook common functions 
 often used by malicious script files which are run using [WScript](https://technet.microsoft.com/en-us/library/hh875526(v=ws.11).aspx)/[CScript](https://technet.microsoft.com/en-us/library/bb490887.aspx).
