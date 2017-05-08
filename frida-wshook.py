@@ -1,7 +1,26 @@
+# -*- coding: utf-8 -*-
 import frida
 import argparse
 import os
 import time
+
+__author__ = "Sean Wilson  - @seanmw"
+__version__ = "1.0.1"
+
+####################################################################################################
+# Changelog
+#
+# 5.7.2017
+#  - Cleaned up how the script exits
+#  - Added logging for when the script host has terminated or the injected script is destroyed
+#
+#
+#
+#
+#
+#
+######################################################################################################
+
 
 class WSHooker(object):
 
@@ -12,6 +31,7 @@ class WSHooker(object):
 
     def __init__(self):
         self.script = None
+        self._process_terminated = False
 
         if os.path.exists(WSHooker._CSCRIPT_PATH_WOW64):
             print ' [*] x64 detected..using SysWOW64'
@@ -19,6 +39,16 @@ class WSHooker(object):
         else:
             print ' [*] Using System32'
             self.wsh_host = WSHooker._CSCRIPT_PATH + WSHooker._CSCRIPT_EXE
+
+    def on_detach(self, message, data):
+        print ' [!] CScript process has terminated!'
+        print '     |- Process Id: %s' % message.pid
+        print '     |- Message: %s' % data
+        self._process_terminated = True
+        print ' [!] Exiting...'
+
+    def on_destroyed(self):
+        print ' [!] Warning: Instrumentation script has been destroyed!'
 
     def on_message(self, message, data):
         if message['type'] == 'send':
@@ -47,7 +77,6 @@ class WSHooker(object):
                     elif hmsg['hook'] == 'wsasend':
                         print " WSASend Called"
                         print "  |-Request Data Start"
-
                         rdata = hmsg['request'].split('\n')
                         for req in rdata:
                             print "    %s" % req
@@ -58,6 +87,8 @@ class WSHooker(object):
                 except TypeError as te:
                     print ' [!] Error parsing hook data!'
                     print ' [!] Error: %s' % te
+        else:
+            print ' [!] Error: %s' % message
 
     def eval_script(self,
                     target_script,
@@ -70,7 +101,7 @@ class WSHooker(object):
         # create the command args
         cmd = [self.wsh_host, target_script]
 
-        # spawn the process
+        # Spawn and attach to the process
         pid = frida.spawn(cmd)
         session = frida.attach(pid)
 
@@ -79,7 +110,14 @@ class WSHooker(object):
             script_js = fp.read()
 
         self.script = session.create_script(script_js, name="wsh_hooker.js")
+        #self.script.set_log_handler(self.log_handler)
+
         self.script.on('message', self.on_message)
+
+        session.on('detached', self.on_detach)
+
+        self.script.on('destroyed', self.on_destroyed)
+
         self.script.load()
 
         # Set Script variables
@@ -97,13 +135,19 @@ class WSHooker(object):
         print ' [*] Hooking Process %s' % pid
         frida.resume(pid)
 
-        # Keep process open
-        raw_input(" [!] Running Script. Ctrl+Z to detach from instrumented program.\n\n")
-        # print("[!] Ctrl+D on UNIX, Ctrl+Z on Windows/cmd.exe to detach from instrumented program.\n\n")
-        # sys.stdin.read()
+        print ' Press ctrl-c to kill the process...'
+        # Keep the process running...
+        while True:
+            try:
+                time.sleep(0.5)
+                if self._process_terminated:
+                    break
+            except KeyboardInterrupt:
+                break
 
-        # Kill it with fire
-        frida.kill(pid)
+        if not self._process_terminated:
+            # Kill it with fire
+            frida.kill(pid)
 
 def main():
     parser = argparse.ArgumentParser(description="frida-wshook.py your friendly WSH Hooker")
@@ -115,6 +159,11 @@ def main():
     parser.add_argument('--disable_net', dest='disable_net', action='store_true', help="Disable Network Requests")
 
     args = parser.parse_args()
+
+    if not args.script.endswith('vbs') and \
+            not args.script.endswith('js'):
+        print ' [!] Error: Invalid Script Extension! Extension must be .js or .vbs'
+        return
 
     wshooker = WSHooker()
     wshooker.eval_script(args.script,
