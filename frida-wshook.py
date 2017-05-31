@@ -5,19 +5,24 @@ import os
 import time
 
 __author__ = "Sean Wilson  - @seanmw"
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 ####################################################################################################
 # Changelog
 #
-# 5.7.2017
-#  - Cleaned up how the script exits
-#  - Added logging for when the script host has terminated or the injected script is destroyed
+# 5.30.2017
+#  - Tested with Frida 10.0.9
+#  - Did some initial testing and added support for wsf files
 #
 # 5.11.2017
 #  - Added hook for application stdout/stderr output. This should give more details when scripts fail or hang
 #  - Changed debug var to be passed in via the class constructor vs a function argument
 #  - Added debug hook for the device being lost.
+#
+# 5.7.2017
+#  - Cleaned up how the script exits
+#  - Added logging for when the script host has terminated or the injected script is destroyed
+#
 #
 ######################################################################################################
 
@@ -181,11 +186,13 @@ def main():
 
     args = parser.parse_args()
 
-    # CScript/Wscript will Error out if the extension is not .vbs or .js (possibly others?)
+    # CScript/Wscript will Error out if the extension is not .vbs, .js or wsf
     # For now check that there is a known supported extension..if not display an error and exit.
-    if not args.script.endswith('vbs') and \
-            not args.script.endswith('js'):
-        print ' [!] Error: Invalid Script Extension! Extension must be .js or .vbs'
+    # TODO: Check and test extensions which are supported by the WScript host
+    ext = args.script.rsplit('.', 1)[1]
+    __valid_extensions = ['vbs', 'js', 'wsf']
+    if not ext.lower() in __valid_extensions:
+        print ' [!] Error: Invalid Script Extension! Extension must be (.js, .vbs, .wsf)'
         return
 
     wshooker = WSHooker(args.debug)
