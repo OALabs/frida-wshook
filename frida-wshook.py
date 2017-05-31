@@ -5,7 +5,7 @@ import os
 import time
 
 __author__ = "Sean Wilson  - @seanmw"
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 ####################################################################################################
 # Changelog
@@ -14,10 +14,10 @@ __version__ = "1.0.1"
 #  - Cleaned up how the script exits
 #  - Added logging for when the script host has terminated or the injected script is destroyed
 #
-#
-#
-#
-#
+# 5.11.2017
+#  - Added hook for application stdout/stderr output. This should give more details when scripts fail or hang
+#  - Changed debug var to be passed in via the class constructor vs a function argument
+#  - Added debug hook for the device being lost.
 #
 ######################################################################################################
 
@@ -29,9 +29,11 @@ class WSHooker(object):
     _CSCRIPT_PATH = "C:\\Windows\System32\\"
     _CSCRIPT_EXE = 'cscript.exe'
 
-    def __init__(self):
+    def __init__(self, debug=False):
+        self.device = None
         self.script = None
         self._process_terminated = False
+        self._debug = debug
 
         if os.path.exists(WSHooker._CSCRIPT_PATH_WOW64):
             print ' [*] x64 detected..using SysWOW64'
@@ -90,13 +92,33 @@ class WSHooker(object):
         else:
             print ' [!] Error: %s' % message
 
+    def on_output(self, pid, fd, data):
+        if not data:
+            return
+
+        lmod = " [!] stderr"
+
+        if fd == 1:
+            lmod = " [*] stdout"
+
+        data = data.split('\n')
+        for line in data:
+            print ' %s> %s' % (lmod, line)
+
+    def on_lost(self):
+        if self._debug:
+            print(" [*] Device Disconnected.")
+
     def eval_script(self,
                     target_script,
-                    debug=False,
                     enable_shell=False,
                     disable_dns=False,
                     disable_send=False,
                     disable_com=False):
+
+        self.device = frida.get_local_device()
+        self.device.on('output', self.on_output)
+        self.device.on('lost', self.on_lost)
 
         # create the command args
         cmd = [self.wsh_host, target_script]
@@ -110,7 +132,6 @@ class WSHooker(object):
             script_js = fp.read()
 
         self.script = session.create_script(script_js, name="wsh_hooker.js")
-        #self.script.set_log_handler(self.log_handler)
 
         self.script.on('message', self.on_message)
 
@@ -123,7 +144,7 @@ class WSHooker(object):
         # Set Script variables
         print ' [*] Setting Script Vars...'
         self.script.post({"type": "set_script_vars",
-                          "debug": debug,
+                          "debug": self._debug,
                           "disable_dns": disable_dns,
                           "enable_shell": enable_shell,
                           "disable_send": disable_send,
@@ -160,14 +181,17 @@ def main():
 
     args = parser.parse_args()
 
+    # CScript/Wscript will Error out if the extension is not .vbs or .js (possibly others?)
+    # For now check that there is a known supported extension..if not display an error and exit.
     if not args.script.endswith('vbs') and \
             not args.script.endswith('js'):
         print ' [!] Error: Invalid Script Extension! Extension must be .js or .vbs'
         return
 
-    wshooker = WSHooker()
+    wshooker = WSHooker(args.debug)
+
+    # Evaluate Script file...
     wshooker.eval_script(args.script,
-                         args.debug,
                          args.enable_shell,
                          args.disable_dns,
                          args.disable_net,
