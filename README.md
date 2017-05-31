@@ -3,8 +3,12 @@
 frida-wshook is an analysis and instrumentation tool which uses [frida.re](https://www.frida.re/) to hook common functions 
 often used by malicious script files which are run using [WScript](https://technet.microsoft.com/en-us/library/hh875526(v=ws.11).aspx)/[CScript](https://technet.microsoft.com/en-us/library/bb490887.aspx).
 
-As the tool intercepts Windows API functions it supports analyzing both .js ([JScript](https://en.wikipedia.org/wiki/JScript)) & .vbs ([VBScript](https://en.wikipedia.org/wiki/VBScript)) 
-scripts and doesn't need to implement function stubs or proxies within the targeted scripting language. 
+The tool intercepts Windows API functions and doesn't implement function stubs or proxies within the targeted 
+scripting language. This allows it to support analyzing a few different script types such as:
+
+ - .js ([JScript](https://en.wikipedia.org/wiki/JScript))
+ - .vbs ([VBScript](https://en.wikipedia.org/wiki/VBScript))
+ - .wsf ([WSFile](https://msdn.microsoft.com/en-us/library/ms995854.aspx)) (Initial support/testing. - Does not support specific jobs)
 
 By default script files are run using cscript.exe and will output:
 
@@ -97,17 +101,9 @@ python frida-wshook.py --disable_com_init bad.vbs
 
 ## Known Issues 
 
- - Passing an unsupported script extension will cause cscript to throw an import error and silently quit. Ensure that the target
-script uses either .js or .vbs as the extension.
-```
-Microsoft (R) Windows Script Host Version 5.812
-Copyright (C) Microsoft Corporation. All rights reserved.
-
-Input Error: There is no script engine for file extension ".bad".
-
-```
  - Network responses are not captured
  - Disabling Object Lookup can cause the script to only output the first ProgId...Malware QA can be lacking. 
+ - WSF files with a specific job to target currently isn't supported
 
 ## TODO
  
@@ -119,6 +115,3 @@ Input Error: There is no script engine for file extension ".bad".
 ## Feedback / Help 
 
 Any questions, comments or requests you can find us on twitter: [@seanmw](https://twitter.com/herrcore) or [@herrcore](https://twitter.com/herrcore)
-
-
- 
